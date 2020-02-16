@@ -111,12 +111,13 @@ function sendRequest(command: string, args: object): void {
 }
 
 function parseResponse(data: string): DebugProtocol.Response {
-  const arr = data.split('\r\n');
-  for (let i = 0; i < arr.length; i++) {
-    console.log(`********  ${i} *********`);
-    console.log(arr[i]);
+  // Extract the "Content Part" and JSON.parse it
+  const match = data.match(/\r\n\r\n{/);
+  if (match === null) {
+    throw `No "Content Part" found in stdout response:\n${data}`;
   }
-  return JSON.parse(arr[arr.length-1]);
+  const substring = data.substring(match.index + match[0].length - 1);
+  return JSON.parse(substring);
 }
 
 export default function main(): void {
