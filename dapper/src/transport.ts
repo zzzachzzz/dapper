@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { DebugProtocol } from 'vscode-debugprotocol';
+import { Requests } from './requests';
 
 const debugAdapter = spawn('node', ['main.js'],
                            {cwd: '/Users/zach/.vscode/extensions/vscode-python/out/client/debugger/debugAdapter/'});
@@ -20,10 +21,11 @@ debugAdapter.stdout.on('data', (data: string): void => {
   switch(response.command) {
     case 'initialize':
       // (Process capabilities response)
-      configurationDoneRequest();
+      sendRequest(Requests.configurationDone());
       break;
     case 'configurationDone':
       // (Launch request)
+      sendRequest(Requests.launch());
       break;
   }
 });
@@ -32,12 +34,6 @@ debugAdapter.stderr.on('data', (data: string): void => {
   console.log('-----Stderr-----');
   console.log(data);
   console.log('----------------');
-});
-
-debugAdapter.on('data', (data) => {
-  console.log('------Data------');
-  console.log('----------------');
-  console.log(data);
 });
 
 debugAdapter.on('close', (code) => {
@@ -70,44 +66,11 @@ debugAdapter.on('disconnect', (message) => {
   console.log('----------------');
 });
 
-function initializeRequest() {
-  sendRequest('initialize', {
-    clientID: 'dapper',
-    clientName: 'dapper',
-    adapterID: 'vscode-python',
-    pathFormat: 'path',
-    linesStartAt1: true,
-    columnsStartAt1: true,
-    supportsVariableType: true,
-    supportsVariablePaging: false,
-    supportsRunInTerminalRequest: true,
-    locale: 'en-US'
-  });
-}
-
-function configurationDoneRequest() {
-  sendRequest('configurationDone', {});
-}
-
-function launchRequest() {
-  sendRequest('launch', {});
-}
-
-let seq = 1;
-
-function sendRequest(command: string, args: object): void {
-  const request = JSON.stringify({
-    seq: seq,
-    type: 'request',
-    command: command,
-    arguments: args
-  });
-  seq++;
-  const message = `Content-Length: ${request.length}\r\n\r\n${request}`;
+function sendRequest(message: string): void {
   console.log('---sendRequest--');
   console.log(message);
   console.log('----------------');
-  debugAdapter.stdin.write(message, 'utf-8', (err) => console.log(`Wrote 1 ${err}`));
+  debugAdapter.stdin.write(message, 'utf-8', (err) => err && console.log(`Error: ${err}`));
 }
 
 function parseResponse(data: string): DebugProtocol.Response {
@@ -122,7 +85,7 @@ function parseResponse(data: string): DebugProtocol.Response {
 
 export default function main(): void {
   console.log('Beginning Initialization...');
-  initializeRequest();
+  sendRequest(Requests.initialize());
 }
 
 /*
