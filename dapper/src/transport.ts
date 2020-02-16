@@ -1,4 +1,5 @@
 import { spawn } from 'child_process';
+import { DebugProtocol } from 'vscode-debugprotocol';
 
 const debugAdapter = spawn('node', ['main.js'],
                            {cwd: '/Users/zach/.vscode/extensions/vscode-python/out/client/debugger/debugAdapter/'});
@@ -6,13 +7,28 @@ const debugAdapter = spawn('node', ['main.js'],
 debugAdapter.stdout.setEncoding('utf-8');
 debugAdapter.stderr.setEncoding('utf-8');
 
-debugAdapter.stdout.on('data', (data) => {
+debugAdapter.stdout.on('data', (data: string): void => {
   console.log('-----Stdout-----');
   console.log(data);
   console.log('----------------');
+
+  const response = parseResponse(data);
+  if (response.success === false) {
+    console.error("Unsuccessful response recieved");
+    return;
+  }
+  switch(response.command) {
+    case 'initialize':
+      // (Process capabilities response)
+      configurationDoneRequest();
+      break;
+    case 'configurationDone':
+      // (Launch request)
+      break;
+  }
 });
 
-debugAdapter.stderr.on('data', (data) => {
+debugAdapter.stderr.on('data', (data: string): void => {
   console.log('-----Stderr-----');
   console.log(data);
   console.log('----------------');
@@ -54,8 +70,8 @@ debugAdapter.on('disconnect', (message) => {
   console.log('----------------');
 });
 
-function initialize() {
-  const response = sendRequest('initialize', {
+function initializeRequest() {
+  sendRequest('initialize', {
     clientID: 'dapper',
     clientName: 'dapper',
     adapterID: 'vscode-python',
@@ -69,9 +85,17 @@ function initialize() {
   });
 }
 
+function configurationDoneRequest() {
+  sendRequest('configurationDone', {});
+}
+
+function launchRequest() {
+  sendRequest('launch', {});
+}
+
 let seq = 1;
 
-function sendRequest(command, args) {
+function sendRequest(command: string, args: object): void {
   const request = JSON.stringify({
     seq: seq,
     type: 'request',
@@ -86,6 +110,28 @@ function sendRequest(command, args) {
   debugAdapter.stdin.write(message, 'utf-8', (err) => console.log(`Wrote 1 ${err}`));
 }
 
-console.log('Beginning Initialization...');
-initialize();
+function parseResponse(data: string): DebugProtocol.Response {
+  const arr = data.split('\r\n');
+  for (let i = 0; i < arr.length; i++) {
+    console.log(`********  ${i} *********`);
+    console.log(arr[i]);
+  }
+  return JSON.parse(arr[arr.length-1]);
+}
+
+export default function main(): void {
+  console.log('Beginning Initialization...');
+  initializeRequest();
+}
+
+/*
+
+# Requests Sequence
+
+* Initalize
+* Add breakpoints (and other config?)
+* configurationDone
+* Launch
+
+*/
 
